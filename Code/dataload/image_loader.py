@@ -10,7 +10,7 @@ class image_loader(base_loader):
         self.batch_size = opt.batch_size
         self.image_size = opt.image_size
         self.isTrain = opt.isTrain
-        self.parent_dir = os.path.dirname(os.getcwd())
+        self.parent_dir = opt.current_path
         self.root = os.path.join(self.parent_dir,opt.strand_dir)
         if self.isTrain:
             self.num_of_val = opt.num_of_val
@@ -66,6 +66,7 @@ class image_loader(base_loader):
 
 
         # image,gt_orientation,strand2D=self.random_translation(image,gt_orientation,strand2D)
+        # gt_orientation 96,128,128,3
         gt_orientation,data_list=self.random_translation(self.opt.image_size,gt_orientation,data_list)
 
 
@@ -73,8 +74,8 @@ class image_loader(base_loader):
         gt_occ=(mask>0).astype(np.float32)[...,None]
         gt_orientation=torch.from_numpy(gt_orientation)
         gt_occ=torch.from_numpy(gt_occ)
-        gt_orientation=gt_orientation.permute(3,0,1,2)
-        gt_occ=gt_occ.permute(3,0,1,2)
+        gt_orientation=gt_orientation.permute(3,0,1,2)#3,96,128,128
+        gt_occ=gt_occ.permute(3,0,1,2)#1,96,128,128
 
         if 'add_info' in data_list:
             add_info=data_list['add_info']
@@ -97,11 +98,11 @@ class image_loader(base_loader):
         save_path=os.path.join(self.opt.current_path, self.opt.save_root, self.opt.check_name, 'record', self.opt.test_file)
         if not os.path.exists(save_path):
             mkdir(save_path)
-        orismooth=cv2.imread(os.path.join(path,'Ori.png'))
-        orismooth=cv2.resize(orismooth,(1024,1024))
-        padding=np.zeros((4*8,1024,3))
-        orismooth=np.concatenate([padding,orismooth],axis=2)[:1024]
-        cv2.imwrite(os.path.join(save_path,'OriSmooth2D.png'),orismooth)
+        # orismooth=cv2.imread(os.path.join(path,'Ori.png'))
+        # orismooth=cv2.resize(orismooth,(1024,1024))
+        # padding=np.zeros((4*8,1024,3))
+        # orismooth=np.concatenate([padding,orismooth],axis=2)[:1024]
+        # cv2.imwrite(os.path.join(save_path,'OriSmooth2D.png'),orismooth)
         # shutil.copyfile(os.path.join(path,'Ori.png'),os.path.join(save_path,'OriSmooth2D.png'))
         image = get_image(path, False, self.opt.image_size, self.opt.Ori_mode,self.opt.blur_ori,self.opt.no_use_depth,use_gt=False)
         image = torch.from_numpy(image)

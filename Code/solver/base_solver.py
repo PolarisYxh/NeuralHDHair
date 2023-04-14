@@ -69,7 +69,7 @@ class BaseSolver(nn.Module):
         return net
 
     def save_network(self,net, label, epoch, opt):
-        save_filename = '%s_%s.pth' % (label, epoch)
+        save_filename = '%s_%s.pth' % (label, epoch)#此处epoch=total_steps_so_far
         save_path = os.path.join(opt.current_path,opt.save_root, opt.name,'checkpoint')
         if int(torch.__version__[2]) >= 6:
             torch.save(net.cpu().state_dict(), save_path + '/' + save_filename,_use_new_zipfile_serialization=False)

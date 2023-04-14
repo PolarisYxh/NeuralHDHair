@@ -1,6 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from Models.base_solver import get_ground_truth_3D_occ, get_ground_truth_3D_ori, get_conditional_input_data
+# from Models.base_solver import get_ground_truth_3D_occ, get_ground_truth_3D_ori, get_conditional_input_data
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+try:
+    from utils import get_ground_truth_3D_occ, get_ground_truth_3D_ori,  get_conditional_input_data, get_pred_3D_ori
+except:
+    from Tools.utils import get_ground_truth_3D_occ, get_ground_truth_3D_ori,  get_conditional_input_data, get_pred_3D_ori
 import cv2
 
 
@@ -91,15 +98,17 @@ def get_vox_total_pic(V, dd=1):
     maskA = None
     Img = np.zeros(shape=[V.shape[1], V.shape[2], 3], dtype=np.float32)
 
-    for sliceID in range(V.shape[0] // dd):
+    for sliceID in range(V.shape[0] // dd):# 从前往后遍历96个体素
         sliceImg = V[sliceID, :, :, :]
         maskB = (sliceImg ** 2).sum(-1) > 1e-3  # H * W
+        # if np.max(maskB):
+        #     print(sliceID)
         if (not flag):
             flag = True
             maskA = maskB.copy()
             Img[maskB, :] = (sliceImg[maskB, :] + 1.0) * 0.5
         else:
-            mask = np.logical_xor(np.logical_or(maskA, maskB), maskA)
+            mask = np.logical_xor(np.logical_or(maskA, maskB), maskA)#类似累加，上一次已经设置了，这次就不设置了
             Img[mask, :] = (sliceImg[mask, :] + 1.0) * 0.5
             maskA = np.logical_or(maskA, maskB)
 
@@ -123,18 +132,19 @@ def draw_arrows_by_projection(fileDir):
     noise = True
     target = get_conditional_input_data(fileDir, flip, noise, image_size=1024) * 255
     hair_ori = get_ground_truth_3D_ori(fileDir, flip)
-
-    image = get_vox_total_pic(hair_ori) / 255.
+    
+    image = get_vox_total_pic(hair_ori)/255 # image 128*128*3, (0,1)
+    # cv2.imwrite("2.png",image.astype('uint8'))
     mask = (image**2).sum(-1) > 0
-    image = image * 2 - 1
+    image = image * 2 - 1 #(-1,1)
 
     for hh in range(h):
         for ww in range(w):
             if mask[hh, ww]:
 
                 o = image[hh, ww][:2]
-                o /= np.sqrt(np.sum(o**2) + 1e-8)
-                o[1] *= -1
+                o /= np.sqrt(np.sum(o**2) + 1e-8)#归一化
+                o[1] *= 1
 
                 # radius = 8
                 o *= 4
@@ -142,9 +152,116 @@ def draw_arrows_by_projection(fileDir):
                 pt1 = (center - o).astype(np.int32)
                 pt2 = (center + o).astype(np.int32)
 
-                cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1)
+                cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
 
-    cv2.imwrite("sss.jpg", target)
+    cv2.imwrite("sss2.jpg", target)
+    
+def draw_gt_arrows_by_projection(fileDir, test=False):
+    h = 128
+    w = 128
+    d = 96
+    flip = True
+    noise = True
+    ori = os.path.join(fileDir, "Ori.png").replace("\\", "/")
+    target = cv2.imread(ori)
+    target = cv2.resize(target, (1024, 1024), interpolation=cv2.INTER_NEAREST)
+    target = cv2.flip(target,flipCode=1)
 
+    hair_ori = get_ground_truth_3D_ori(fileDir, flip)
+    iter="gt"
+    image = get_vox_total_pic(hair_ori)/255 # image 128*128*3, (0,1)
+    # cv2.imwrite("2.png",image.astype('uint8'))
+    mask = (image**2).sum(-1) > 0
+    image = image * 2 - 1 #(-1,1)
 
-# draw_arrows_by_projection("E:\wukeyu\hair_reconstruction\TrainData/video1/frame3")
+    for hh in range(h):
+        for ww in range(w):
+            if mask[hh, ww]:
+
+                o = image[hh, ww][:2]
+                o /= np.sqrt(np.sum(o**2) + 1e-8)#归一化
+                o[1] *= 1
+
+                # radius = 8
+                o *= 4
+                center = np.array([ww * 8 + 4, hh * 8 + 4])
+                pt1 = (center - o).astype(np.int32)
+                pt2 = (center + o).astype(np.int32)
+
+                cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
+    cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)
+           
+def draw_arrows_by_projection1(fileDir,iter,draw_occ=True):
+    h = 128
+    w = 128
+    d = 96
+    flip = True
+    noise = True
+    ori = os.path.join(fileDir, "Ori.png").replace("\\", "/")
+    target = cv2.imread(ori)
+    target = cv2.resize(target, (1024, 1024), interpolation=cv2.INTER_NEAREST)
+    target = cv2.flip(target,flipCode=1)
+    # target = get_conditional_input_data(fileDir, flip, noise, image_size=1024) * 255
+    hair_ori = get_pred_3D_ori(fileDir, iter, flip, draw_occ=draw_occ)
+    
+    image = get_vox_total_pic(hair_ori)/255 # image 128*128*3, (0,1)
+    # cv2.imwrite("2.png",image.astype('uint8'))
+    mask = (image**2).sum(-1) > 0
+    image = image * 2 - 1 #(-1,1)
+
+    for hh in range(h):
+        for ww in range(w):
+            if mask[hh, ww]:
+
+                o = image[hh, ww][:2]
+                o /= np.sqrt(np.sum(o**2) + 1e-8)#归一化
+                o[1] *= 1
+
+                # radius = 8
+                o *= 4
+                center = np.array([ww * 8 + 4, hh * 8 + 4])
+                pt1 = (center - o).astype(np.int32)
+                pt2 = (center + o).astype(np.int32)
+
+                cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
+    if draw_occ:
+        cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}_1.jpg"), target)
+    else:
+        cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)
+        
+def draw_arrows_by_projection2(target_img, hair_ori, fileDir, iter,draw_occ=True):
+    h = 128
+    w = 128
+    d = 96
+    flip = True
+    noise = True
+    
+    target = cv2.resize(target_img, (1024, 1024), interpolation=cv2.INTER_NEAREST)
+    target = cv2.flip(target,flipCode=1)
+    # target = get_conditional_input_data(fileDir, flip, noise, image_size=1024) * 255
+    image = get_vox_total_pic(hair_ori)/255 # image 128*128*3, (0,1)
+    # cv2.imwrite("2.png",image.astype('uint8'))
+    mask = (image**2).sum(-1) > 0
+    image = image * 2 - 1 #(-1,1)
+
+    for hh in range(h):
+        for ww in range(w):
+            if mask[hh, ww]:
+
+                o = image[hh, ww][:2]
+                o /= np.sqrt(np.sum(o**2) + 1e-8)#归一化
+                o[1] *= 1
+
+                # radius = 8
+                o *= 4
+                center = np.array([ww * 8 + 4, hh * 8 + 4])
+                pt1 = (center - o).astype(np.int32)
+                pt2 = (center + o).astype(np.int32)
+
+                cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
+    if draw_occ:
+        cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}_1.jpg"), target)
+    else:
+        cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)
+if __name__=="__main__":
+    draw_arrows_by_projection1("/home/yangxinhang/NeuralHDHair/data/Train_input/strands00001",iter='150000',draw_occ=True)

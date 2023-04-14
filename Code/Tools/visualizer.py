@@ -5,14 +5,16 @@ import cv2
 import random
 import torch
 from torchvision.utils import save_image
-import imageio
+from torch.utils.tensorboard import SummaryWriter
 class Visualizer():
     def __init__(self, opt):
         self.opt = opt
-
+        self.epoch_error={"ori_loss":[],"occ_loss":[]}
+        self.last_iter = 0
         if opt.isTrain:
 
             save_path = os.path.join(opt.current_path, opt.save_root)
+            self.writer = SummaryWriter(os.path.join(save_path, opt.name, 'logs/train'))
             self.log_name = os.path.join(save_path, opt.name, 'logs','loss_log.txt')
             with open(self.log_name, "a") as log_file:
                 now = time.strftime("%c")
@@ -35,8 +37,30 @@ class Visualizer():
         print(message)
         with open(self.log_name, "a") as log_file:
             log_file.write('%s\n' % message)
+      
+    def board_current_errors(self, errors):
+        for k, v in errors.items():
+            # print(v)
+            # if v != 0:
+            v = v.mean().float()
+            self.epoch_error[k].append(float(v))
+        
+    def print_epoch_errors(self, epoch, curr_size=None):
+        tt = time.asctime(time.localtime(time.time()))
 
-
+        message = '(epoch end: %d) ' % (epoch)
+        message = str(tt) + message
+        for k, v in self.epoch_error.items():
+            # print(v)
+            # if v != 0:
+            loss_mean = sum(v)/len(v)
+            self.writer.add_scalar(k,loss_mean,epoch)
+            v.clear()
+            message += '%s: %.3f ' % (k, loss_mean)
+        # self.writer.close()
+        print(message)
+        with open(self.log_name, "a") as log_file:
+            log_file.write('%s\n' % message)
 
 
 

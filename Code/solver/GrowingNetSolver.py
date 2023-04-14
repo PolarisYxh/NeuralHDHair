@@ -71,9 +71,9 @@ class GrowingNetSolver(BaseSolver):
             gt_orientation = gt_orientation.cuda()
             if labels is not None:
                 labels = labels.cuda()
-                labels = labels.permute(0, 3, 1, 2)
-        gt_orientation = gt_orientation.permute(0, 4, 1, 2, 3)
-        strands = strands.permute(0, 3, 1, 2)
+                labels = labels.permute(0, 3, 1, 2)#1, 1, 800, 72
+        gt_orientation = gt_orientation.permute(0, 4, 1, 2, 3)#1,3,96,128,128
+        strands = strands.permute(0, 3, 1, 2)#1,3,800,72
 
         return strands,gt_orientation,labels
 
@@ -111,12 +111,12 @@ class GrowingNetSolver(BaseSolver):
                 # iter_counter.record_one_iteration()
                 strands,gt_orientation,labels=self.preprocess_input(datas)
 
-                in_points = strands[...,+1:-1]
+                in_points = strands[...,+1:-1]#1,3,800,72 to 1,3,800,70
 
 
 
 
-                sta_points = strands[..., (2 * self.pt_num // 3) // 2:(2 * self.pt_num // 3) // 2 + 1]
+                sta_points = strands[..., (2 * self.pt_num // 3) // 2:(2 * self.pt_num // 3) // 2 + 1]#取24索引的内部点
                 pre_points = strands[..., :-2]
                 aft_points = strands[..., +2:]
                 # print(pre_points[0,:,0,:])

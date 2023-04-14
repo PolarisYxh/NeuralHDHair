@@ -27,7 +27,19 @@ The source code of the networks for our paper ["NeuralHDHair: Automatic High-fid
 3.Train GrowingNet 
 
     python main.py --name=yourname --model_name=GrowingNet  --batch_size=1 --sd_per_batch=800 --pt_per_strand 72
-
+# Test #
+1.Test Coarse module
+    python test.py --name=yourname --model_name=HairSpatNet --blur_ori --no_use_depth --no_use_L --gpu_ids=0 --batch_size=1
+# visualize in tensorboard #
+```
+in server
+tensorboard --logdir=/home/yangxinhang/NeuralHDHair/checkpoints/HairSpatNet/2023-04-13_bust/logs/train --port=10086
+```
+```
+in 本地
+ssh -L 10086:127.0.0.1:10086 151 -N -v -v
+151即为
+```
 # Tips #
 1.Data, some data processing and rendering code do not have permissions and cannot open source temporarily.
 

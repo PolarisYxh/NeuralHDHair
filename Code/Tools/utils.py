@@ -80,7 +80,7 @@ def get_add_info(d,strand_size,info_mode,use_gt=False,suffix=''):
 
 def get_image(d,flip=False,image_size=256,mode='Ori_conf',blur=False,no_use_depth=False,use_gt=False,use_conf=False):
 
-    if mode=='Ori':
+    if mode=='Ori':#方向图，只要1,2通道
         if blur:
             ori = os.path.join(d, 'Ori.png').replace("\\", "/")
         else:
@@ -262,7 +262,7 @@ def get_Strand2D(d,image_size=256,use_gt=False,strand_mode='strand'):
 
 def get_conditional_input_data(d, flip=False, random_noise=False, image_size=256):
     dep = os.path.join(d, "Depth.png").replace("\\", "/")
-    ori = os.path.join(d, "OriSmooth2D.png").replace("\\", "/")
+    ori = os.path.join(d, "Ori.png").replace("\\", "/")
 
     depImg = cv2.imread(dep)
     oriImg = cv2.imread(ori)
@@ -361,11 +361,10 @@ def get_ground_truth_3D_ori(d, flip=False,growInv=False):
         else:
             file=os.path.join(d, "Ori_gt.mat").replace("\\", "/")
         transfer=True
-    # print(file)
+    # print(file) ori: 128*128*288
     ori = scipy.io.loadmat(file, verify_compressed_data_integrity=False)['Ori'].astype(np.float32)
-
-    ori = np.reshape(ori, [ori.shape[0], ori.shape[1], 3, -1])
-    ori = ori.transpose([0, 1, 3, 2]).transpose(2, 0, 1, 3)
+    ori = np.reshape(ori, [ori.shape[0], ori.shape[1], 3, -1])# ori: 128*128*3*96
+    ori = ori.transpose([0, 1, 3, 2]).transpose(2, 0, 1, 3)# ori: 96*128*128*3
 
     if flip:
         ori = ori[:, :, ::-1, :] * np.array([-1.0, 1.0, 1.0])
@@ -375,7 +374,28 @@ def get_ground_truth_3D_ori(d, flip=False,growInv=False):
         return ori*np.array([1,-1,-1])  # scaled
     else:
         return ori
+def get_pred_3D_ori(d, whitch_iter, flip=False, draw_occ=False):
+    file = os.path.join(d, "Ori3D.mat").replace("\\", "/")
+    transfer=False
+    if not os.path.exists(file):
+        if draw_occ:
+            file=os.path.join(d, f"Ori3D_{whitch_iter}_1_pred.mat").replace("\\", "/")
+        else:
+            file=os.path.join(d, f"Ori3D_{whitch_iter}_pred.mat").replace("\\", "/")
+        transfer=True
+    # print(file) ori: 128*128*288
+    ori = scipy.io.loadmat(file, verify_compressed_data_integrity=False)['Ori'].astype(np.float32)
+    ori = np.reshape(ori, [ori.shape[0], ori.shape[1], 3, -1])# ori: 128*128*3*96
+    ori = ori.transpose([0, 1, 3, 2]).transpose(2, 0, 1, 3)# ori: 96*128*128*3
 
+    if flip:
+        ori = ori[:, :, ::-1, :] * np.array([-1.0, 1.0, 1.0])
+
+    ori = np.ascontiguousarray(ori)
+    if transfer:
+        return ori*np.array([1,-1,-1])  # scaled
+    else:
+        return ori
 def get_ground_truth_forward(d, flip=False, normalize=False):
     file = os.path.join(d, "ForwardWarp.mat").replace("\\", "/")
     if os.path.exists(file):
@@ -519,10 +539,11 @@ def get_all_the_data(dirs):
     #         data.append(os.path.join(dirs,file))
     #Delete data with number greater than 600
     for file in files:
-        if int(file[2:])>600:
-            continue
-        else:
-            data.append(os.path.join(dirs,file))
+        data.append(os.path.join(dirs,file))
+        # if int(file[2:])>600:
+        #     continue
+        # else:
+        #     data.append(os.path.join(dirs,file))
     print("num of the strand model:{}".format(len(data)))
     return data
 
@@ -564,7 +585,7 @@ def save_ori_as_mat(ori,opt,suffix=''):
     if not os.path.exists(path):
         mkdirs(path)
     scipy.io.savemat(os.path.join(path,'Ori3D{}_pred.mat'.format(suffix)), {'Ori': ori})
-
+    return ori
 # def write_strand(points,opt,segments,type='ori'):
 #     print('delete by {} ....'.format(type))
 #     print('point_count',len(points))
@@ -794,7 +815,7 @@ def transform(points):
     :return: 体素化的点云
     '''
     mul=1
-    stepInv = 1. / (0.00567194/mul)
+    stepInv = 1. / (0.00567194/mul)#voxel 边长0.00567194
     gridOrg= np.array([-0.3700396, 1.22352, -0.261034], dtype=np.float32)
 
     points -= gridOrg
@@ -952,9 +973,9 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
 
     samle_voxel_index=np.where(sample_voxel[0,...,0]>0)
 
-    prob_sample_index=[]
-    for z,y,x in zip(samle_voxel_index[0],samle_voxel_index[1],samle_voxel_index[2]):
-        prob_sample_index.extend([[z,y,x]]*int((sample_voxel[0,z,y,x,0])))
+    prob_sample_index=[]#n*3
+    # for z,y,x in zip(samle_voxel_index[0],samle_voxel_index[1],samle_voxel_index[2]):
+    #     prob_sample_index.extend([[z,y,x]]*int((sample_voxel[0,z,y,x,0])))
     max_sample_edge=len(prob_sample_index)
 
     prob_sample_index=np.array(prob_sample_index)
@@ -963,7 +984,7 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
 
     ##注意，训练时虽然是 1000*72*3 即一次训练1000根，每根训练72个点，但这些点在训练时并没有任何关联，只是为了方便训练，可以理解为1000*72 相当于batch大小
     ##因为我们的formulation就是  f(x1,x2,x3,z)=x4  x1,x2,x3为一根发丝上3个连续的点，结合3个点及第三个点所在的patch的latent code推测第四个点x4的位置
-    for i in range(sd_num):
+    for i in range(sd_num):#1000
 
         sample_strand=random.randint(0,len(segments)-1)
         begin = sum(segments[:sample_strand])
@@ -974,12 +995,12 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
         if growInv:
             strand=strand[::-1,:]   ####grow down to up
 
-        max_in_ori_point_every_strand=2*pt_num//3
+        max_in_ori_point_every_strand=2*pt_num//3 #48个点
         if max_in_ori_point_every_strand>segment:
             points_in_ori=strand
             num_in_ori=segment
-        else:
-            random_sample=random.random()
+        else:#如果头发丝点数大于48
+            random_sample=random.random()#随机取48个点
             if random_sample<0.65:
                 points_in_ori=strand[:max_in_ori_point_every_strand]
             elif random_sample<0.85:
@@ -990,10 +1011,11 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
             num_in_ori=points_in_ori.shape[0]
         label1 = np.ones((num_in_ori, 1))
         num_out_ori = pt_num - num_in_ori
-        points_out_ori = prob_sample_index[np.random.randint(0, max_sample_edge, size=num_out_ori)]
-        points_out_ori = np.random.random(size=points_out_ori.shape[:]) + points_out_ori[..., ::-1]
-        points_out_ori[0:1]=np.floor(points_in_ori[-1:]/4)*4
-        points_out_ori[1:2]=np.floor(points_in_ori[-1:]/4)*4
+        points_out_ori = strand[np.random.randint(0, strand.shape[0], size=num_out_ori)]
+        # points_out_ori = prob_sample_index[np.random.randint(0, max_sample_edge, size=num_out_ori)]#num_out_ori*3
+        # points_out_ori = np.random.random(size=points_out_ori.shape[:]) + points_out_ori[..., ::-1]
+        # points_out_ori[0:1]=np.floor(points_in_ori[-1:]/4)*4
+        # points_out_ori[1:2]=np.floor(points_in_ori[-1:]/4)*4
 
         train_strand= np.concatenate((points_in_ori, points_out_ori), axis=0)
         label10 = np.zeros((num_out_ori, 1))
@@ -1377,7 +1399,7 @@ def get_luminance_map(dir,flip,image_size,no_use_bust=False):
     # if not no_use_bust:
     #     img_L = torch.where(label[:,0:1,...] != 0, img_L, Bust[:, 0:1, ...])
 
-        # save_image(img_L,'display.jpg')
+    save_image(img_L,'display3.jpg')
         # save_image(img,'display2.jpg')
 
     return img_L[0]
@@ -1427,13 +1449,13 @@ def get_Bust(dir,image,image_size):
     label[label < 0.0039] = 0
 
 
-    image = torch.unsqueeze(image, 0)
-    label = torch.unsqueeze(label, 0)
+    image = torch.unsqueeze(image, 0)#方向图
+    label = torch.unsqueeze(label, 0)#mask
     # label=torch.norm(image,2,dim=1,keepdim=True)
     # label[label >0]=1
     # label=label.repeat(1,2,1,1)
     # label=torch.where(image[:,0:2,...]!=0,torch.ones_like(image[:,0:2,...]),torch.zeros_like(image[:,0:2,...]))
-    Bust = torch.unsqueeze(Bust, 0)
+    Bust = torch.unsqueeze(Bust, 0)#人体渲染图
     image[:,0:2,...]=torch.where(label[:,0:2,...]==1,image[:,0:2,...],Bust[:,0:2,...])
     # save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
     if not os.path.exists(os.path.join(dir, 'trans.txt')):

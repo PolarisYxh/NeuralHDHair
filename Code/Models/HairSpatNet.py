@@ -72,7 +72,7 @@ class HairSpatNet(BaseNetwork):
 
         D,H,W=resolution
         mul = m_w /W
-        index=Ori2D.nonzero()
+        index=Ori2D.nonzero()#n*5
         x_min=max(torch.min(index[:,2:3])//mul-4//mul,0)
         x_max=min(torch.max(index[:,2:3])//mul+16//mul,W-1)
         y_min=max(torch.min(index[:,3:4])//mul-6//mul,0)
@@ -144,16 +144,16 @@ class HairSpatNet(BaseNetwork):
             self.gt_occ.append(gt_occ_[None, ...])
             gt_ori_=gt_ori[b, :, z[..., 0], y[..., 0], x[..., 0]]
             self.gt_ori.append(gt_ori_[None,...])
-            self.points.append(index[:min_size][None, ...])
+            self.points.append(index[:min_size][None, ...]) # sample voxels where is occupancy 
             self.loss_weight.append(loss_weight[None, ...])
 
-        self.points = torch.cat(self.points, dim=0).type(torch.float32)
+        self.points = torch.cat(self.points, dim=0).type(torch.float32)#self.points [1, 63149, 3]
         self.gt_ori = torch.cat(self.gt_ori, dim=0)
         self.gt_occ = torch.cat(self.gt_occ, dim=0)
         self.loss_weight = torch.cat(self.loss_weight, dim=0)
         # self.loss_weight=None
 
-        self.points /= torch.tensor([W-1, H-1, D-1], dtype=torch.float).cuda()
+        self.points /= torch.tensor([W-1, H-1, D-1], dtype=torch.float).cuda()#self.points  voxels normalize
         self.points = self.points[:, :, [1, 0, 2]]
 
 
@@ -175,7 +175,7 @@ class HairSpatNet(BaseNetwork):
         z=points[:,:,2:3]*95.
         z=z.permute(0,2,1)
         depth=self.index(depth_map, xy)
-        self.loss_weight=0.4+(depth-z+10.)/20.
+        self.loss_weight=0.4+(depth-z+10.)/20.#z越大，loss_weight越小
         self.loss_weight=self.loss_weight.clamp(0.2,1.)
         self.loss_weight=torch.where(depth==0,torch.ones_like(self.loss_weight),self.loss_weight)
 
@@ -186,9 +186,9 @@ class HairSpatNet(BaseNetwork):
             D,H,W=gt_occ.size()[2:]
             self.out_ori=torch.zeros(B,3,D,H,W).cuda()
             self.out_occ=torch.zeros(B,1,D,H,W).cuda()
-            if random.random()<0.7:
+            if random.random()<0.7:#loss偏小
                 self.sample_train_point(gt_occ,gt_ori,sample_negative=True)
-            else:
+            else:#loss偏大
                 self.sample_train_point(gt_occ, gt_ori, sample_negative=False)
             if depth_map is not None:
 
@@ -198,7 +198,7 @@ class HairSpatNet(BaseNetwork):
                 depth=self.depth_feat
             else:
                 depth=None
-            caches=self.encoder(x)
+            caches=self.encoder(x)#5*[1, 32, 128, 128],[1, 64, 64, 64],[1, 128, 32, 32],[1, 256, 16, 16],[1, 256, 8, 8]
 
             ori,phi_ori=self.decoder_ori(caches,self.points,depth=depth)
             occ,phi_occ=self.decoder_occ(caches,self.points,depth=depth)

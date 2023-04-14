@@ -37,7 +37,7 @@ class HairModelingHDSolver(BaseSolver):
 
 
     def initialize_networks(self,opt):
-        self.net_global=HairSpatNet(opt,in_cha=opt.input_nc,min_cha=self.Spat_min_cha,max_cha=self.Spat_max_cha)
+        self.net_global=HairSpatNet(opt,in_cha=opt.input_nc,min_cha=self.Spat_min_cha,max_cha=self.Spat_max_cha)#U-net
         self.net_local=Local_Filter(opt)
 
         self.net_global.print_network()
@@ -104,11 +104,11 @@ class HairModelingHDSolver(BaseSolver):
                 self.init_losses()
                 iter_counter.record_one_iteration()
 
-                image,gt_orientation,gt_occ,Ori2D,add_info= self.preprocess_input(datas)
+                image,gt_orientation,gt_occ,Ori2D,add_info= self.preprocess_input(datas)# ori.png(orientation map),(size,3,96,128,128),(size,1,96,128,128),
                 # save_image(add_info,'test.png')
                 unsample = torch.nn.Upsample(scale_factor=self.opt.resolution[0]//96, mode='trilinear')
                 gt_occ_low=gt_occ.clone()
-                gt_orientation = unsample(gt_orientation)
+                gt_orientation = unsample(gt_orientation)#size,3,96,128,128 to size,3,192,256,256
                 gt_occ=unsample(gt_occ)
 
 

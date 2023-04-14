@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from Tools.utils import *
 from Models.Discriminator import Spat_Discriminator
 import torch.autograd
+from Tools.drawTools import draw_arrows_by_projection2
 class HairSpatNetSolver(BaseSolver):
 
     @staticmethod
@@ -93,7 +94,20 @@ class HairSpatNetSolver(BaseSolver):
         # save_image(torch.cat([image,torch.zeros(1,1,256,256).cuda()],dim=1),'test_image.png')
         # save_image(depth,'test_depth.png')
         return image,gt_orientation,gt_occ,Ori2D,depth
-
+    def preprocess_input1(self,datas):
+        image = datas['image'].type(torch.float)
+        gt_orientation = datas['gt_ori'].type(torch.float)
+        gt_occ=datas['gt_occ']
+        Ori2D = datas['Ori2D'].type(torch.float)
+        
+        if self.use_gpu():
+            image = image.cuda()
+            gt_orientation = gt_orientation.cuda()
+            gt_occ=gt_occ.cuda()
+            Ori2D = Ori2D.cuda()
+        # save_image(torch.cat([image,torch.zeros(1,1,256,256).cuda()],dim=1),'test_image.png')
+        # save_image(depth,'test_depth.png')
+        return image,gt_orientation,gt_occ,Ori2D
 
 
     def use_gpu(self):
@@ -116,7 +130,7 @@ class HairSpatNetSolver(BaseSolver):
 
                 if torch.sum(depth)==0:
                     depth=None
-                depth=None
+                # depth=None
                 out_ori, out_occ,self.G_loss['ori_loss'],self.G_loss['occ_loss'] = self.model(image,gt_occ,gt_orientation,depth_map=depth,no_use_depth=self.opt.no_use_depth)
                 # out_ori, _,self.G_loss['ori_loss'],_ = self.model(image,gt_occ,gt_orientation,depth_map=depth,no_use_depth=self.opt.no_use_depth)
 
@@ -145,12 +159,12 @@ class HairSpatNetSolver(BaseSolver):
                 self.loss_backward(self.G_loss, self.optimizer,False)
 
 
-
+                losses = self.get_latest_losses()
+                visualizer.board_current_errors(losses)
                 if iter_counter.needs_printing():
 
-                    losses = self.get_latest_losses()
                     visualizer.print_current_errors(epoch, iter_counter.epoch_iter, losses, iter_counter.time_per_iter)
-                if iter_counter.needs_displaying():
+                if iter_counter.needs_displaying():#every 20 steps
                     # positive=torch.sigmoid(out_occ)>0.65
                     out_occ[out_occ>=0.2]=1
                     out_occ[out_occ<0.2]=0
@@ -162,28 +176,31 @@ class HairSpatNetSolver(BaseSolver):
                           (epoch, iter_counter.total_steps_so_far))
                     self.save_network(self.model, 'HairSpatNet', iter_counter.total_steps_so_far, self.opt)
                     self.save_network(self.model, 'HairSpatNet', 'latest', self.opt)
-                    self.save_network(self.Discriminator, 'Discriminator', iter_counter.total_steps_so_far, self.opt)
-                    self.save_network(self.Discriminator,'Discriminator','latest',self.opt)
+                    if self.opt.use_gan:
+                        self.save_network(self.Discriminator, 'Discriminator', iter_counter.total_steps_so_far, self.opt)
+                        self.save_network(self.Discriminator,'Discriminator','latest',self.opt)
 
                     iter_counter.record_current_iter()
+            visualizer.print_epoch_errors(epoch, iter_counter.epoch_iter)
             self.update_learning_rate(epoch)
             iter_counter.record_epoch_end()
 
     def test(self,dataloader):
         with torch.no_grad():
             datas = dataloader.generate_test_data()
-            image, gt_orientation, gt_occ = self.preprocess_input(datas)
-            out_ori, out_occ = self.model(image)
-
+            image, gt_orientation, gt_occ, ori2d = self.preprocess_input1(datas)
+            out_ori, out_occ = self.model.test(image,ori2d)
             pred_ori=out_ori*gt_occ
             pred_ori=pred_ori.permute(0,2,3,4,1)
             pred_ori=pred_ori.cpu().numpy()
-            save_ori_as_mat(pred_ori,self.opt)
-
-
-
-
-
+            ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter))
+            
+            out_occ[out_occ>=0.2]=1
+            out_occ[out_occ<0.2]=0
+            pred_ori=out_ori*out_occ
+            pred_ori=pred_ori.permute(0,2,3,4,1)
+            pred_ori=pred_ori.cpu().numpy()
+            ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter)+'_1')
 
 
     def loss_backward(self, losses, optimizer,retain=False):
@@ -202,7 +219,7 @@ class HairSpatNetSolver(BaseSolver):
         return self.total_loss
 
     def update_learning_rate(self, epoch):
-        if epoch % 6 == 0 and epoch != 0:
+        if epoch % self.opt.lr_update_freq == 0 and epoch != 0:
             self.learning_rate = self.learning_rate // 2
 
         for param_group in self.optimizer.param_groups:
@@ -210,3 +227,4 @@ class HairSpatNetSolver(BaseSolver):
 
         for param_group_d in self.D_optimizer.param_groups:
             param_group_d['lr'] = self.learning_rate
+        print(f"update lr to :{self.learning_rate}")

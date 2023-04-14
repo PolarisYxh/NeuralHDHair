@@ -22,7 +22,8 @@ class TrainOptions(BaseOptions):
         # display the results
         parser.add_argument('--save_latest_freq', type=int, default=5000,
                                  help='frequency of saving the latest results')
-
+        parser.add_argument('--lr_update_freq', type=int, default=1000,
+                                 help='frequency of update the learning rate')
         # train which network, the networks are trained separatly currently, to do: train together
         parser.add_argument('--train_flow', action='store_true')
 

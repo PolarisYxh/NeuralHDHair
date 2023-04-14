@@ -84,31 +84,31 @@ class GrowingNet(BaseNetwork):
         # ori = torch.(ori, ((0, 0), (d//2, d//2), (h//2, h//2), (w//2, w//2), (0, 0)))
         if self.opt.local_size!=self.opt.stride:    ###modify
             pad=nn.ConstantPad3d(self.local_size//2,0)
-            ori=pad(ori)
+            ori=pad(ori)#[1, 3, 96, 128, 128] to [1, 3, 104, 136, 136]
             start=0
         else:
             start=self.stride//2
         for z in range(self.latent_size[0]):
             for y in range(self.latent_size[1]):
-                for x in range(self.latent_size[2]):
+                for x in range(self.latent_size[2]):#步长为4,长度为8,所以有一半重叠
 
                     beg = [z * self.stride, y * self.stride, x * self.stride]
                     end = [beg[i] + self.local_size for i in range(3)]
-                    local_ori=torch.unsqueeze(ori[:,:,beg[0]:end[0],beg[1]:end[1],beg[2]:end[2]],dim=1)
+                    local_ori=torch.unsqueeze(ori[:,:,beg[0]:end[0],beg[1]:end[1],beg[2]:end[2]],dim=1)#[1, 1, 3, 8, 8, 8]
 
                     latents.append(local_ori)
                     center= [z * self.stride+start, y * self.stride+start, x * self.stride+start]    ###modify
                     centers.append(torch.tensor(center))
 
         centers=torch.cat(centers,dim=0)
-        centers=torch.reshape(centers,(1,*self.latent_size,3))
+        centers=torch.reshape(centers,(1,*self.latent_size,3))#[1, 25, 33, 33, 3]
         centers=centers.expand(B,*self.latent_size,3)
         centers=torch.flip(centers,[-1])
 
         centers=centers.type(torch.float)
         centers=centers.cuda()
         # centers=centers.permute(0,4,1,2,3)
-        latents=torch.cat(latents,dim=1)
+        latents=torch.cat(latents,dim=1) # 27225* [1, 1, 3, 8, 8, 8]
 
         latents=torch.reshape(latents,(B,*self.latent_size,3,d,h,w))
 
@@ -125,11 +125,11 @@ class GrowingNet(BaseNetwork):
         C代表每个patch被转化为C维的特征向量
         '''
         # first get local oris and corresponding global centers
-        centers, local_oris = self.get_ori_slices(ori)
+        centers, local_oris = self.get_ori_slices(ori)#centers:1,25,33,33,3; local_oris:[1,25,33,33,3,8,8,8]
         latents = torch.reshape(local_oris, (-1,3, self.local_size, self.local_size, self.local_size))
 
-        latents=self.OriEncoder(latents)
-        latents=torch.reshape(latents,(-1,*self.latent_size,self.max_cha))
+        latents=self.OriEncoder(latents)# return N:27225,C:128,1,1,1
+        latents=torch.reshape(latents,(-1,*self.latent_size,self.max_cha))# 1,N:25,33,33,C:128
 
 
         return centers, latents
@@ -159,7 +159,7 @@ class GrowingNet(BaseNetwork):
         s=s[...,None]
 
         # s=s.expand(B,3,D,P,8)   #B*3*D*P*8
-        s=s.expand(B,3,D,P,N)   #B*3*D*P*8  #modify
+        s=s.expand(B,3,D,P,N)   #[1, 3, 800, 70, 1] to [1, 3, 800, 70, 8]; B*3*D*P*8  #modify
 
         if self.opt.condition:
             if mode=='nn':
@@ -208,19 +208,19 @@ class GrowingNet(BaseNetwork):
 
 
 
-        wcenters = torch.reshape(wcenters, (B, wcenters.size(1),D, -1))
+        wcenters = torch.reshape(wcenters, (B, wcenters.size(1),D, -1))#[1,3,800,70,8] to [1,3,800,560]
 
-        wlatents = torch.reshape(wlatents, (B, C,D, -1))
+        wlatents = torch.reshape(wlatents, (B, C,D, -1))#[1, 128, 800, 70, 8] to [1, 128, 800, 560]
 
-        p=torch.reshape(p,(B,wcenters.size(1),D,-1))
+        p=torch.reshape(p,(B,wcenters.size(1),D,-1))#[1, 3, 800, 70, 8] to [1, 3, 800, 560]
         # wlatents=torch.zeros_like(wlatents)
 
 
-        x = torch.cat([wlatents, p], 1)   ####use the same variable to save memory
+        x = torch.cat([wlatents, p], 1)   ####use the same variable to save memory; [1, 131, 800, 560]
         # n = torch.cat([wlatents, p], 1)   ####use the same variable to save memory
 
 
-        pos=decoder_pos(x,p)
+        pos=decoder_pos(x,p)#pos [1, 3, 800, 560]
 
         # label=decoder_label(x,p)
 
@@ -234,7 +234,7 @@ class GrowingNet(BaseNetwork):
         """
         warp feature from latents, which has the shape of B * latent_size * C
         :param s: B * N * P * 3
-        :param latents: latent features B * latent_size * C
+        :param latents: latent features B * latent_size * C;  [1, 25, 33, 33, 128]
         该部分比较难理解，可以直接问我
         get_voxel_value即根据所给的点坐标s（s分解为，xyz），利用该坐标找到其所在的patch 取出其对应的patch的 中心坐标及latent code  且此处为并行操作。
         linear_sample  参考论文，分patch时有许多重复的地方，重复的地方使用三线性插值
@@ -244,7 +244,7 @@ class GrowingNet(BaseNetwork):
         def my_sample(NoInputHere, zz, yy, xx):
 
 
-            wcenters = self.get_voxel_value(centers, zz, yy, xx)
+            wcenters = self.get_voxel_value(centers, zz, yy, xx)#wcenters:[1, 800, 70, 8, 3]
 
             wlatents = self.get_voxel_value(latents, zz, yy, xx)
 
@@ -351,7 +351,7 @@ class GrowingNet(BaseNetwork):
             return strands,labels
 
 
-    def get_voxel_value(self, voxel, z, y, x):
+    def get_voxel_value(self, voxel, z, y, x):#voxel center: [1, 25, 33, 33, 3]
         B = z.size(0)
         b = torch.arange(0, B)
         b=b.type(torch.long)
@@ -359,7 +359,7 @@ class GrowingNet(BaseNetwork):
         S = list(z.size())[1:]
         for _ in S:
             b = torch.unsqueeze(b, -1)
-        b = b.expand(B,*S)
+        b = b.expand(B,*S) #全0，因为第0维只有一个数据
 
         out=voxel[b, z, y, x, :]
         return out
@@ -499,14 +499,14 @@ class GrowingNet(BaseNetwork):
         total_z = torch.cat([z0, z0, z0, z0, z1, z1, z1, z1], -1)  ###B*D*P*8
         total_y = torch.cat([y0, y0, y1, y1, y0, y0, y1, y1], -1)
         total_x = torch.cat([x0, x1, x0, x1, x0, x1, x0, x1], -1)
-        V, L = warp_fn(voxel, total_z, total_y, total_x)
+        V, L = warp_fn(voxel, total_z, total_y, total_x)#V:1,3,800,560  pos / r + wcenters[:,0:3,...]; L:1,2,800,560   , pos[:,0:2,...]
 
 
-        V = torch.reshape(V, (b, 3, d, p, 8))
-        L = torch.reshape(L, (b, 2, d, p, 8))
+        V = torch.reshape(V, (b, 3, d, p, 8))#[1, 3, 800, 70, 8]
+        L = torch.reshape(L, (b, 2, d, p, 8))#[1, 2, 800, 70, 8]
 
-        V000, V001, V010, V011, V100, V101, V110, V111 = torch.chunk(V, 8, -1)
-        L000, L001, L010, L011, L100, L101, L110, L111, = torch.chunk(L, 8, -1)
+        V000, V001, V010, V011, V100, V101, V110, V111 = torch.chunk(V, 8, -1)#[1, 3, 800, 70, 1]
+        L000, L001, L010, L011, L100, L101, L110, L111, = torch.chunk(L, 8, -1)#[1, 2, 800, 70, 1]
 
         wz = wz.permute(0, 3, 1, 2)
         wy = wy.permute(0, 3, 1, 2)
