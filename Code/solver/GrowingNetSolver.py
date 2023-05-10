@@ -73,7 +73,7 @@ class GrowingNetSolver(BaseSolver):
                 labels = labels.cuda()
                 labels = labels.permute(0, 3, 1, 2)#1, 1, 800, 72
         gt_orientation = gt_orientation.permute(0, 4, 1, 2, 3)#1,3,96,128,128
-        strands = strands.permute(0, 3, 1, 2)#1,3,800,72
+        strands = strands.permute(0, 3, 1, 2)#train:1,3,800,72; test:[1, 3, 15000, 1]
 
         return strands,gt_orientation,labels
 
@@ -116,7 +116,7 @@ class GrowingNetSolver(BaseSolver):
 
 
 
-                sta_points = strands[..., (2 * self.pt_num // 3) // 2:(2 * self.pt_num // 3) // 2 + 1]#取24索引的内部点
+                sta_points = strands[..., (2 * self.pt_num // 3) // 2:(2 * self.pt_num // 3) // 2 + 1]#取所有发丝的内部24索引点，用于测试并显示结果
                 pre_points = strands[..., :-2]
                 aft_points = strands[..., +2:]
                 # print(pre_points[0,:,0,:])
@@ -174,7 +174,7 @@ class GrowingNetSolver(BaseSolver):
 
                 #####backward
                 self.loss_backward(self.total_loss,self.optimizer_GN)
-
+                visualizer.board_current_errors(self.total_loss)
                 if iter_counter.needs_printing():
                     losses = self.get_latest_losses()
                     visualizer.print_current_errors(epoch, iter_counter.epoch_iter,losses, iter_counter.time_per_iter)
@@ -215,8 +215,9 @@ class GrowingNetSolver(BaseSolver):
                     self.save_network(self.GrowingNet, 'GrowingNet', iter_counter.total_steps_so_far, self.opt)
                     self.save_network(self.GrowingNet, 'GrowingNet', 'latest', self.opt)
                     iter_counter.record_current_iter()
-        # self.update_learning_rate(epoch)
-        iter_counter.record_epoch_end()
+            visualizer.print_epoch_errors(epoch, iter_counter.epoch_iter)
+            # self.update_learning_rate(epoch)
+            iter_counter.record_epoch_end()
 
 
     def test(self,dataloader):
@@ -275,10 +276,12 @@ class GrowingNetSolver(BaseSolver):
         mask = np.linalg.norm(gt_orientation, axis=-1)
 
         strand_delete_by_ori, segment = delete_point_out_ori(mask, out_points_2)
-        strand_delete_by_label, segment_label = delete_point_out_label(out_points_2, labels_2)
+        if self.opt.pred_label:
+            strand_delete_by_label, segment_label = delete_point_out_label(out_points_2, labels_2)
         if self.opt.Bidirectional_growth:
             strand_delete_by_ori_Inv, segment_Inv = delete_point_out_ori(mask, out_points_2_Inv)
-            strand_delete_by_label_Inv, segment_label_Inv = delete_point_out_label(out_points_2_Inv, labels_2_Inv)
+            if self.opt.pred_label:
+                strand_delete_by_label_Inv, segment_label_Inv = delete_point_out_label(out_points_2_Inv, labels_2_Inv)
         else:
             segment_Inv = None
             segment_label_Inv = None
@@ -287,10 +290,11 @@ class GrowingNetSolver(BaseSolver):
 
         final_strand_del_by_ori, final_segment = concat_strands(strand_delete_by_ori, strand_delete_by_ori_Inv, segment,
                                                                 segment_Inv, self.opt.Bidirectional_growth,gt_orientation.shape[2]//96)
-        final_strand_del_by_label, final_segment_label = concat_strands(strand_delete_by_label,
-                                                                        strand_delete_by_label_Inv, segment_label,
-                                                                        segment_label_Inv,
-                                                                        self.opt.Bidirectional_growth)
+        if self.opt.pred_label:
+            final_strand_del_by_label, final_segment_label = concat_strands(strand_delete_by_label,
+                                                                            strand_delete_by_label_Inv, segment_label,
+                                                                            segment_label_Inv,
+                                                                            self.opt.Bidirectional_growth)
         write_strand(final_strand_del_by_ori, self.opt, final_segment, 'ori')
         # write_strand(final_strand_del_by_label, self.opt, final_segment_label, 'label')
 

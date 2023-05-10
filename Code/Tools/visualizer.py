@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 class Visualizer():
     def __init__(self, opt):
         self.opt = opt
-        self.epoch_error={"ori_loss":[],"occ_loss":[]}
+        self.epoch_error ={}
         self.last_iter = 0
         if opt.isTrain:
 
@@ -43,6 +43,8 @@ class Visualizer():
             # print(v)
             # if v != 0:
             v = v.mean().float()
+            if k not in self.epoch_error:
+                self.epoch_error[k]=[]
             self.epoch_error[k].append(float(v))
         
     def print_epoch_errors(self, epoch, curr_size=None):
@@ -65,7 +67,7 @@ class Visualizer():
 
 
     def draw_samples(self, strands_in, strands_ot, s,width,height,depth,name="sss"):
-
+        # 两个发丝x,y坐标画在img1上；y,z坐标画在img2上
         s_in = strands_in[s]
         s_ot = strands_ot[s]
 

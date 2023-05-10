@@ -686,7 +686,7 @@ def write_strand(points,opt,segments,type='ori'):
     print(path)
     hair_count=len(segments)
     point_count=sum(segments)
-    with open(path + '/' + 'hair.hair', 'wb')as f:
+    with open(path + '/' + f'hair_{opt.which_iter}.hair', 'wb')as f:
         f.write(struct.pack('I', hair_count))
         f.write(struct.pack('I', point_count))
         for num_every_strand in segments:
@@ -774,13 +774,6 @@ def write_obj_with_label(points,labels,opt):
             f1.write(struct.pack('f', vec[1]))
             f1.write(struct.pack('f', vec[2]))
     f1.close()
-
-
-
-
-
-
-
 
 def load_strand(d,trans=True):
     file = os.path.join(d, "hair_delete.hair").replace("\\", "/")
@@ -974,8 +967,8 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
     samle_voxel_index=np.where(sample_voxel[0,...,0]>0)
 
     prob_sample_index=[]#n*3
-    # for z,y,x in zip(samle_voxel_index[0],samle_voxel_index[1],samle_voxel_index[2]):
-    #     prob_sample_index.extend([[z,y,x]]*int((sample_voxel[0,z,y,x,0])))
+    for z,y,x in zip(samle_voxel_index[0],samle_voxel_index[1],samle_voxel_index[2]):
+        prob_sample_index.extend([[z,y,x]]*int((sample_voxel[0,z,y,x,0])))
     max_sample_edge=len(prob_sample_index)
 
     prob_sample_index=np.array(prob_sample_index)
@@ -1000,7 +993,7 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
             points_in_ori=strand
             num_in_ori=segment
         else:#如果头发丝点数大于48
-            random_sample=random.random()#随机取48个点
+            random_sample=random.random()#随机取48个点,按概率从大到小取发尾，发根，发中
             if random_sample<0.65:
                 points_in_ori=strand[:max_in_ori_point_every_strand]
             elif random_sample<0.85:
@@ -1010,12 +1003,12 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
                 points_in_ori=strand[start:start+max_in_ori_point_every_strand]
             num_in_ori=points_in_ori.shape[0]
         label1 = np.ones((num_in_ori, 1))
-        num_out_ori = pt_num - num_in_ori
-        points_out_ori = strand[np.random.randint(0, strand.shape[0], size=num_out_ori)]
-        # points_out_ori = prob_sample_index[np.random.randint(0, max_sample_edge, size=num_out_ori)]#num_out_ori*3
-        # points_out_ori = np.random.random(size=points_out_ori.shape[:]) + points_out_ori[..., ::-1]
-        # points_out_ori[0:1]=np.floor(points_in_ori[-1:]/4)*4
-        # points_out_ori[1:2]=np.floor(points_in_ori[-1:]/4)*4
+        num_out_ori = pt_num - num_in_ori#24
+        # points_out_ori = strand[np.random.randint(0, strand.shape[0], size=num_out_ori)]
+        points_out_ori = prob_sample_index[np.random.randint(0, max_sample_edge, size=num_out_ori)]#num_out_ori*3
+        points_out_ori = np.random.random(size=points_out_ori.shape[:]) + points_out_ori[..., ::-1]
+        points_out_ori[0:1]=np.floor(points_in_ori[-1:]/4)*4
+        points_out_ori[1:2]=np.floor(points_in_ori[-1:]/4)*4
 
         train_strand= np.concatenate((points_in_ori, points_out_ori), axis=0)
         label10 = np.zeros((num_out_ori, 1))

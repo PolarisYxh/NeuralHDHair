@@ -125,7 +125,7 @@ class GrowingNet(BaseNetwork):
         C代表每个patch被转化为C维的特征向量
         '''
         # first get local oris and corresponding global centers
-        centers, local_oris = self.get_ori_slices(ori)#centers:1,25,33,33,3; local_oris:[1,25,33,33,3,8,8,8]
+        centers, local_oris = self.get_ori_slices(ori)#pad ori to [104,136,136]; centers:[1,25,33,33,3]; local_oris:[1,25,33,33,3,8,8,8]
         latents = torch.reshape(local_oris, (-1,3, self.local_size, self.local_size, self.local_size))
 
         latents=self.OriEncoder(latents)# return N:27225,C:128,1,1,1
@@ -141,22 +141,22 @@ class GrowingNet(BaseNetwork):
 
         '''
 
-        :param s: 3D点云的坐标
-        :param wcenters: 每个点坐标对应其所在patch的中心坐标
-        :param wlatents: 每个点坐标对应其所在patch的latent code
+        :param s: 3D点云的voxel坐标，[1, 3, 800, 70]
+        :param wcenters: 每个点坐标对应其所在8个patch的中心坐标，8个patch会重叠
+        :param wlatents: 每个点坐标对应其所在8个patch的latent code;[1, 128, 800, 70, 8]
         :param decoder_pos: 解码器，输入为 一个latent code 及连续3个相邻点坐标的concatenate，最好问下我，输出是下一个点坐标
         :param decoder_label: 与上述相同，输出为是否在orientation 内  暂时可以不用
         :param mode: nn代表单次训练，rnn代表迭代训练 不懂问我
         :param Inv: 暂时重要
         :param cond: 是否使用condition，即是否使用连续的前几个点作为condition，如果为false则输入仅为 该点 及该点对应的latent code的concatenate
         :param cat_self: 我也忘了，暂时按默认设置
-        :return:
+        :return: voxel坐标 x,y,z都有; [-1,1] normalized patch坐标， 只有 x,y 坐标
         '''
 
         B,C,D,P,N=wlatents.size()
 
         # print(wcenters.size())
-        s=s[...,None]
+        s=s[...,None]#[1, 3, 800, 70，1]
 
         # s=s.expand(B,3,D,P,8)   #B*3*D*P*8
         s=s.expand(B,3,D,P,N)   #[1, 3, 800, 70, 1] to [1, 3, 800, 70, 8]; B*3*D*P*8  #modify
@@ -202,7 +202,7 @@ class GrowingNet(BaseNetwork):
             wcenters=wcenters.repeat(1,3,1,1,1)
 
         r = 2. / self.local_size
-        p = r * (s - wcenters)          # [-1, 1],  see paper
+        p = r * (s - wcenters)          # all is [1, 3, 800, 70, 8]; 分别在8 patches里面归一化到[-1, 1],  see paper
 
 
 
@@ -232,24 +232,26 @@ class GrowingNet(BaseNetwork):
 
     def warp_feature(self, s, centers, latents,decoder_pos,decoder_label,mode='nn',Inv=False,cond=None,cat_self=False):   ### delete step
         """
-        warp feature from latents, which has the shape of B * latent_size * C
-        :param s: B * N * P * 3
-        :param latents: latent features B * latent_size * C;  [1, 25, 33, 33, 128]
+        warp feature from latents, which has the shape of B * latent_size * C; 得到下个点的voxel坐标和label
+        :param s: B * N * P * 3； points:[1, 3, 800, 70]每根发丝采样到的70个点，或者每根发丝推理时的24索引点
+        :param latents: latent features B * latent_size * C;  [1, 25, 33, 33, 128]        :param centers:[1, 25, 33, 33, 3];
         该部分比较难理解，可以直接问我
         get_voxel_value即根据所给的点坐标s（s分解为，xyz），利用该坐标找到其所在的patch 取出其对应的patch的 中心坐标及latent code  且此处为并行操作。
-        linear_sample  参考论文，分patch时有许多重复的地方，重复的地方使用三线性插值
+        linear_sample:  参考论文，分patch时有许多重复的地方，根据顶点patch坐标得到所在的8个有重叠的patch索引;
+        然后进入my_sample函数对顶点voxel坐标进行decoder，得到下个点的voxel坐标x,y,z都有，8个点坐标; [-1,1] normalized patch坐标， 只有 x,y 坐标
+        这8个点坐标进行三线性插值（重复的地方使用三线性插值），得到最终的下个点坐标
         """
 
 
         def my_sample(NoInputHere, zz, yy, xx):
 
 
-            wcenters = self.get_voxel_value(centers, zz, yy, xx)#wcenters:[1, 800, 70, 8, 3]
+            wcenters = self.get_voxel_value(centers, zz, yy, xx)#wcenters:[1, 800, 70, 8, 3],根据顶点所在的8个有重叠的patch索引，拿了8个有重叠的patch中心
 
-            wlatents = self.get_voxel_value(latents, zz, yy, xx)
+            wlatents = self.get_voxel_value(latents, zz, yy, xx)#[1, 800, 70, 8, 128],根据顶点所在的8个有重叠的patch索引，拿了8个有重叠的patch隐变量
 
-            wlatents = wlatents.permute(0, 4, 1, 2,3)
-            wcenters = wcenters.permute(0, 4, 1, 2,3)
+            wlatents = wlatents.permute(0, 4, 1, 2,3)#[1, 128, 800, 70, 8]
+            wcenters = wcenters.permute(0, 4, 1, 2,3)#[1, 3,   800, 70, 8]
 
 
 
@@ -259,7 +261,7 @@ class GrowingNet(BaseNetwork):
             return out
 
             # since the first center is 0, 0, 0
-        ss = (s) / self.stride           # be care that the coordinate of p is x, y, z
+        ss = (s) / self.stride           # be care that the coordinate of p is x, y, z, 将voxel的坐标转为边长为8的patch的坐标
         if self.local_size==self.stride:
             return self.linear_sample1(None, ss, my_sample, self.sample_mode,
                                  D=self.latent_size[0], H=self.latent_size[1], W=self.latent_size[2])
@@ -314,7 +316,7 @@ class GrowingNet(BaseNetwork):
 
         # first cut ori into slices, with or without overlapping
 
-        centers, latents = self.encoder(ori)
+        centers, latents = self.encoder(ori)#ori:[1, 3, 96, 128, 128];centers:[1, 25, 33, 33, 3];latents:[1, 25, 33, 33, 128]
         # print(centers.size())
 
         # prev_point=starting_points.repeat(1,2,1,1)
@@ -323,7 +325,7 @@ class GrowingNet(BaseNetwork):
         # prev_point_Inv=None
         prev_point = starting_points
         prev_point_Inv = starting_points
-        for step in range(steps):
+        for step in range(steps):#预测之后的steps个点
             # start=time.time()
             points,label = self.warp_feature(points, centers, latents,self.Decoder_pos,self.Decoder_label,mode='rnn',Inv=False,cond=prev_point)
             prev_point=torch.cat([prev_point,points],dim=1)[:,-9:,...]
@@ -352,6 +354,17 @@ class GrowingNet(BaseNetwork):
 
 
     def get_voxel_value(self, voxel, z, y, x):#voxel center: [1, 25, 33, 33, 3]
+        """get voxel 8 points' values
+
+        Args:
+            voxel (_type_): _description_
+            z (_type_): _description_
+            y (_type_): _description_
+            x (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """        
         B = z.size(0)
         b = torch.arange(0, B)
         b=b.type(torch.long)
@@ -359,9 +372,9 @@ class GrowingNet(BaseNetwork):
         S = list(z.size())[1:]
         for _ in S:
             b = torch.unsqueeze(b, -1)
-        b = b.expand(B,*S) #全0，因为第0维只有一个数据
+        b = b.expand(B,*S) #全0，因为第0维只有一个数据,[1,800,70,8]
 
-        out=voxel[b, z, y, x, :]
+        out=voxel[b, z, y, x, :]#[1, 25, 33, 33, 128]
         return out
 
 
@@ -463,14 +476,14 @@ class GrowingNet(BaseNetwork):
 
     def linear_sample(self, voxel, nPos, warp_fn, sample_mode, D, H, W, cal_normal=False):
 
-        nPos = nPos.permute(0, 2, 3, 1)
+        nPos = nPos.permute(0, 2, 3, 1)#[1, 800, 70, 3]
 
         x, y, z = torch.chunk(nPos, 3, dim=-1)
 
         b, d, p, _ = x.size()
-        maxZ = (D - 1).type(torch.int32)
-        maxY = (H - 1).type(torch.int32)
-        maxX = (W - 1).type(torch.int32)
+        maxZ = (D - 1).type(torch.int32)#96/4=24
+        maxY = (H - 1).type(torch.int32)#128/4=32
+        maxX = (W - 1).type(torch.int32)#128/4=32
 
         z0 = torch.floor(z)
         y0 = torch.floor(y)
@@ -496,10 +509,10 @@ class GrowingNet(BaseNetwork):
 
 
 
-        total_z = torch.cat([z0, z0, z0, z0, z1, z1, z1, z1], -1)  ###B*D*P*8
+        total_z = torch.cat([z0, z0, z0, z0, z1, z1, z1, z1], -1)  ###B*D*P*8，得到点所在8个patch索引
         total_y = torch.cat([y0, y0, y1, y1, y0, y0, y1, y1], -1)
         total_x = torch.cat([x0, x1, x0, x1, x0, x1, x0, x1], -1)
-        V, L = warp_fn(voxel, total_z, total_y, total_x)#V:1,3,800,560  pos / r + wcenters[:,0:3,...]; L:1,2,800,560   , pos[:,0:2,...]
+        V, L = warp_fn(voxel, total_z, total_y, total_x)#my_sample;V:1,3,800,560  pos / r + wcenters[:,0:3,...]，voxel点坐标; L:1,2,800,560 , pos[:,0:2,...]，patch内坐标[-1,1]归一化
 
 
         V = torch.reshape(V, (b, 3, d, p, 8))#[1, 3, 800, 70, 8]

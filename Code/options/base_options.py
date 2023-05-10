@@ -26,7 +26,7 @@ class BaseOptions():
         parser.add_argument('--growInv', action='store_true')
         parser.add_argument('--Bidirectional_growth', default=True)
         parser.add_argument('--continue_train', action='store_true')
-
+        parser.add_argument('--pred_label', action='store_true')
 
 
 

@@ -264,4 +264,5 @@ def draw_arrows_by_projection2(target_img, hair_ori, fileDir, iter,draw_occ=True
     else:
         cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)
 if __name__=="__main__":
-    draw_arrows_by_projection1("/home/yangxinhang/NeuralHDHair/data/Train_input/strands00001",iter='150000',draw_occ=True)
+    # draw_arrows_by_projection1("/home/yangxinhang/NeuralHDHair/data/Train_input/strands00001",iter='150000',draw_occ=True)
+    draw_gt_arrows_by_projection("/home/yangxinhang/NeuralHDHair/data/Train_input/DB1")

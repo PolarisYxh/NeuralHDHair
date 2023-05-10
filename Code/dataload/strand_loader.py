@@ -8,7 +8,7 @@ class strand_loader(base_loader):
         self.opt = opt
         self.batch_size = opt.batch_size
         self.sd_num = opt.sd_per_batch #800
-        self.pt_num = opt.pt_per_strand #72
+        self.pt_num = opt.pt_per_strand #72,发丝上的点数
         self.image_size = opt.image_size
         self.isTrain = opt.isTrain
         # self.parent_dir = os.path.dirname(os.getcwd())
@@ -47,8 +47,8 @@ class strand_loader(base_loader):
         segments, points = load_strand(file_name,True)
 
         gt_orientation = get_ground_truth_3D_ori(file_name, False, growInv=self.opt.growInv)
-        # sample_voxel = np.load(os.path.join(file_name, 'sample_voxel.npy'))
-        sample_voxel = np.zeros((4,4,4))
+        sample_voxel = np.load(os.path.join(file_name, 'sample_voxel.npy'))
+        # sample_voxel = np.ones((1,4,4,4,1))
         strands, labels = sample_to_padding_strand1(sample_voxel, segments, points, self.pt_num, self.sd_num,
                                                     growInv=self.opt.growInv)
         strands=torch.from_numpy(strands)

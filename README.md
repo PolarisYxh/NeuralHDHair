@@ -14,22 +14,25 @@ The source code of the networks for our paper ["NeuralHDHair: Automatic High-fid
 - NVIDIA GPU + CUDA 11.1
 
 
-
+# get data #
+1. Code/Tools/get_voxelsample.py to compute sample_voxel.mat
 
 # Train #
-1.Train Coarse module
+1.Train Coarse module, intput: Ori.png、mask.png, output gt: Ori_gt.mat
 
     python main.py --name=yourname --model_name=HairSpatNet --blur_ori --no_use_depth --no_use_L --gpu_ids=0 --batch_size=1
 2.Train Global module
 
     python main.py --name=yourname --model_name=HairModelingHD --blur_ori --no_use_depth  --gpu_ids=0 --batch_size=1 --pretrain_path=pretrain_model_path
 
-3.Train GrowingNet 
+3.Train GrowingNet, input:;output:hair_delete.hair
 
     python main.py --name=yourname --model_name=GrowingNet  --batch_size=1 --sd_per_batch=800 --pt_per_strand 72
 # Test #
 1.Test Coarse module
     python test.py --name=yourname --model_name=HairSpatNet --blur_ori --no_use_depth --no_use_L --gpu_ids=0 --batch_size=1
+2. Test GrowingNet,
+    
 # visualize in tensorboard #
 ```
 in server
