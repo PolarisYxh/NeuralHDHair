@@ -19,7 +19,7 @@ class TestOptions(BaseOptions):
         parser.add_argument('--add_align_height',type=int,default=0)
         parser.add_argument('--add_offset_x',type=int,default=0)
         parser.add_argument('--translate_ori',type=int,default=3)
-
+        parser.add_argument('--pred_label', action='store_true')
         self.isTrain = False
 
         return parser

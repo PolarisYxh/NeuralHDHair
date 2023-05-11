@@ -993,7 +993,7 @@ def sample_to_padding_strand1(sample_voxel,segments,points,pt_num,sd_num,growInv
             points_in_ori=strand
             num_in_ori=segment
         else:#如果头发丝点数大于48
-            random_sample=random.random()#随机取48个点,按概率从大到小取发尾，发根，发中
+            random_sample=random.random()#随机取48个点,按概率从大到小取发根，发尾，发中
             if random_sample<0.65:
                 points_in_ori=strand[:max_in_ori_point_every_strand]
             elif random_sample<0.85:
