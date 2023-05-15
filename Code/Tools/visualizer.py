@@ -6,6 +6,7 @@ import random
 import torch
 from torchvision.utils import save_image
 from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
 class Visualizer():
     def __init__(self, opt):
         self.opt = opt
@@ -64,29 +65,28 @@ class Visualizer():
         with open(self.log_name, "a") as log_file:
             log_file.write('%s\n' % message)
 
-    def draw_3d(self,strands_in, strands_ot,s, width,height,depth):
-        # draw 3d curve
+    def draw_3d(self,strands_in, strands_ot,s, width,height,depth,name="sss"):
+        # draw 3d curve; strands_in:gt; strands_ot:pred
         s_in = strands_in[s]
+        s_in = s_in[~np.all(s_in == 0, axis=1)]
         s_ot = strands_ot[s]
         
         bbmin = np.array([0, 0, 0], dtype=np.float32)
         bbmax = np.array([width-1, height-1, depth-1], dtype=np.float32)
 
-        s_in = np.maximum(np.minimum(np.round(s_in), bbmax), bbmin).astype(np.int32)
-        s_ot = np.maximum(np.minimum(np.round(s_ot), bbmax), bbmin).astype(np.int32)
+        s_in = np.maximum(np.minimum(s_in, bbmax), bbmin)
+        s_ot = np.maximum(np.minimum(s_ot, bbmax), bbmin)
         x,y,z = s_ot.T
         x1,y1,z1 = s_in.T
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.plot(x,y,z,'k-')
-        ax.plot(x1, y1, z1, 'o-', label='Control Points')
+        ax.plot(x,y,z,'k-',color="green")
+        ax.plot(x1, y1, z1, 'o-', markersize=1,color="blue",label='Control Points')
         plt.show()
         # Axes3D.plot()
         f = plt.gcf()  #获取当前图像
 
-        f.savefig("lines.png")
+        f.savefig(name+".png")
         
 
     def draw_samples(self, strands_in, strands_ot, s,width,height,depth,name="sss"):
@@ -109,8 +109,8 @@ class Visualizer():
         img2[s_in[:, 2], s_in[:, 1]] = 120
         img2[s_ot[:, 2], s_ot[:, 1]] = 250
 
-        cv2.imwrite(f"{name}_1.jpg", img1)
-        cv2.imwrite(f"{name}_2.jpg", img2)
+        cv2.imwrite(f"{name}_11.jpg", img1)
+        cv2.imwrite(f"{name}_21.jpg", img2)
 
     def draw_ori(self,image,gt_ori,out_ori,ori_occ,suffix,mul=1):
         sliceId = random.randint(24*mul,72*mul)

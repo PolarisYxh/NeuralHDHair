@@ -202,12 +202,13 @@ class GrowingNetSolver(BaseSolver):
                     drap_points=drap_points.permute(0,2,3,1)
                     drap_points=drap_points.cpu().detach().numpy()
                     drap_gt_points=drap_gt_points.cpu().detach().numpy()
-                    visualizer.draw_3d(drap_gt_points[0], drap_points[0], s,self.width,self.height,self.depth)
-                    visualizer.draw_samples(drap_gt_points[0], drap_points[0], s,self.width,self.height,self.depth, "Forward")
+                    visualizer.draw_3d(drap_gt_points[0], drap_points[0], s,self.width,self.height,self.depth, "Forward3d")
+                    # visualizer.draw_samples(drap_gt_points[0], drap_points[0], s,self.width,self.height,self.depth, "Forward")
                     if self.opt.Bidirectional_growth:
                         drap_points_Inv = drap_points_Inv.permute(0, 2, 3, 1)
                         drap_points_Inv = drap_points_Inv.cpu().detach().numpy()
-                        visualizer.draw_samples(drap_gt_points[0], drap_points_Inv[0], s,self.width,self.height,self.depth, "Backward")
+                        visualizer.draw_3d(drap_gt_points[0], drap_points_Inv[0], s,self.width,self.height,self.depth, "Backward3d")
+                        # visualizer.draw_samples(drap_gt_points[0], drap_points_Inv[0], s,self.width,self.height,self.depth, "Backward")
 
 
                 if iter_counter.needs_saving():
@@ -217,7 +218,7 @@ class GrowingNetSolver(BaseSolver):
                     self.save_network(self.GrowingNet, 'GrowingNet', 'latest', self.opt)
                     iter_counter.record_current_iter()
             visualizer.print_epoch_errors(epoch, iter_counter.epoch_iter)
-            # self.update_learning_rate(epoch)
+            self.update_learning_rate(epoch)
             iter_counter.record_epoch_end()
 
 
@@ -230,7 +231,7 @@ class GrowingNetSolver(BaseSolver):
 
 
 
-
+        pt_num = self.pt_num//2 #default is self.pt_num-1
 
         with torch.no_grad():
             for i in range(2):
@@ -245,7 +246,7 @@ class GrowingNetSolver(BaseSolver):
                     # print('encoder cost:',time.time()-start)
                     # gt_orientation = close_voxel(gt_orientation, 5)
                     gt_orientation=gt_orientation.expand(len(self.opt.gpu_ids),*gt_orientation.size()[1:])
-                    out_points_2, labels_2, out_points_2_Inv, labels_2_Inv=self.model(strands,gt_orientation,self.pt_num//2,'rnn')
+                    out_points_2, labels_2, out_points_2_Inv, labels_2_Inv=self.model(strands,gt_orientation,pt_num,'rnn')
                     # torch.cuda.synchronize()
                     print('grow cost:', time.time() - start)
 
@@ -258,8 +259,8 @@ class GrowingNetSolver(BaseSolver):
         out_points_2=out_points_2.permute(0,2,3,1)
         labels_2=labels_2.permute(0,2,3,1)
 
-        out_points_2 = out_points_2.reshape(1, -1,  self.pt_num-1,3)
-        labels_2 = labels_2.reshape(1, -1,  self.pt_num-1,2)
+        out_points_2 = out_points_2.reshape(1, -1,  pt_num, 3)
+        labels_2 = labels_2.reshape(1, -1,  pt_num,2)
 
         gt_orientation=gt_orientation.cpu().numpy()
         out_points_2=out_points_2.cpu().numpy()
@@ -268,8 +269,8 @@ class GrowingNetSolver(BaseSolver):
 
             out_points_2_Inv = out_points_2_Inv.permute(0, 2, 3, 1)
             labels_2_Inv = labels_2_Inv.permute(0, 2, 3, 1)
-            out_points_2_Inv=out_points_2_Inv.reshape(1,-1,self.pt_num-1,3)
-            labels_2_Inv=labels_2_Inv.reshape(1,-1,self.pt_num-1,2)
+            out_points_2_Inv=out_points_2_Inv.reshape(1,-1,pt_num,3)
+            labels_2_Inv=labels_2_Inv.reshape(1,-1,pt_num,2)
             out_points_2_Inv=out_points_2_Inv.cpu().numpy()
             labels_2_Inv=labels_2_Inv.cpu().numpy()
 

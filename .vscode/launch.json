@@ -17,9 +17,9 @@
             //for train growing net
             // "args": ["--name=2023-05-06_bust", "--model_name=GrowingNet",  "--batch_size=1", "--sd_per_batch=800", "--pt_per_strand", "72","--lr_update_freq=1000", "--strand_dir", "data/cache","--gpu_ids=1","--condition"],//"--save_dir", "/home/yangxinhang/NeuralHDHair","--test_file","1","--continue_train",
             //run main.py for test growingnet
-            "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--batch_size=1", "--sd_per_batch=800", "--pt_per_strand", "72","--lr_update_freq=1000", "--strand_dir", "data/Train_input","--gpu_ids=3","--continue_train","--display_freq=1","--check_name=2023-05-06_bust","--which_iter=45000"],
+            // "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--batch_size=1", "--sd_per_batch=800", "--pt_per_strand", "72","--lr_update_freq=1000", "--strand_dir", "data/Train_input","--gpu_ids=3","--continue_train","--display_freq=1","--check_name=2023-05-11_bust_prev3","--which_iter=5000","--condition"],
             //for test run test.py and visualize run batch_test.py growing net
-            // "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--test_file","strands00001","--save_dir=data/Train_input",  "--strand_dir", "data/cache","--gpu_ids=1","--continue_train","--which_iter=5000","--check_name=2023-05-06_bust","--condition"],//"--save_dir", "/home/yangxinhang/NeuralHDHair","--test_file","1","--continue_train",
+            "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--test_file","strands00001","--save_dir=data/Train_input",  "--strand_dir", "data/Train_input","--gpu_ids=1","--continue_train","--which_iter=5000","--check_name=2021-10-13_bust"],//,"--condition""--save_dir", "/home/yangxinhang/NeuralHDHair","--test_file","1","--continue_train",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
