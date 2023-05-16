@@ -135,6 +135,15 @@ def get_image(d,flip=False,image_size=256,mode='Ori_conf',blur=False,no_use_dept
 
 
     return np.ascontiguousarray(input)
+def trans_image(oriImg,image_size):
+    oriImg = cv2.resize(oriImg, (image_size, image_size))
+    oriData = oriImg[:, :, [2, 1]].astype(np.float32) / 255.0  # R AND G
+    index=np.where(oriData[:,0:1]<0.2,np.zeros_like(oriData[:,2:3]),np.ones_like(oriData[:,2:3]))
+    oriData=(oriData-0.5)*2
+    oriData=(oriData+1)/2
+    input=oriData
+    input=input.astype(np.float32)
+    return np.ascontiguousarray(input)
 
 # def load_image(d,transform_image,Inv=False):
 #     if Inv:
@@ -1458,7 +1467,63 @@ def get_Bust(dir,image,image_size):
 
 
     return image[0]
+def get_Bust1(mask, image, image_size):
+    # label_path = os.path.join(dir, 'mask.png')
+    Bust_path=dir.split('data')[0]
+    Bust_path=os.path.join(Bust_path,'data/Bust')
+    ### use bust with different size to adpat different faces
+    if os.path.exists(os.path.join(dir,'trans.txt')):
 
+        if dir[-2:]!='_0':
+            trans=os.path.join(dir,'trans.txt')
+            with open(trans,'r') as f:
+                f.readline()
+                f.readline()
+                f.readline()
+                f.readline()
+                scale=f.readline()
+            f.close()
+            scale=float(scale)
+            Ind_large=min((scale-0.80)//0.05+3,9)
+            Ind_small=max((scale-0.80)//0.05-1,1)
+            randI = random.randint(Ind_small, Ind_large)
+            Bust_path = os.path.join(Bust_path, 'color{}.png'.format(randI))
+        else:
+            randI=random.randint(2,6)
+            Bust_path=os.path.join(Bust_path,'color{}.png'.format(randI))
+    else:
+        Bust_path = os.path.join(Bust_path, 'color5.png')
+
+    # Bust_path = os.path.join(dir, 'color.png')
+
+    label = transforms.ToPILImage()(mask)
+    # label = Image.open(label_path)
+    Bust = Image.open(Bust_path)
+    transform_list = []
+    transform_list += [transforms.Resize((image_size, image_size))]
+    transform_list += [transforms.ToTensor()]
+    transform_image = transforms.Compose(transform_list)
+    label = transform_image(label)
+    Bust = transform_image(Bust)
+    label = label[0:3]
+    label[label >= 0.0039] = 1
+    label[label < 0.0039] = 0
+
+
+    image = torch.unsqueeze(image, 0)#方向图
+    label = torch.unsqueeze(label, 0)#mask
+    # label=torch.norm(image,2,dim=1,keepdim=True)
+    # label[label >0]=1
+    # label=label.repeat(1,2,1,1)
+    # label=torch.where(image[:,0:2,...]!=0,torch.ones_like(image[:,0:2,...]),torch.zeros_like(image[:,0:2,...]))
+    Bust = torch.unsqueeze(Bust, 0)#人体渲染图
+    image[:,0:2,...]=torch.where(label[:,0:2,...]==1,image[:,0:2,...],Bust[:,0:2,...])
+    # save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
+    if not os.path.exists(os.path.join(dir, 'trans.txt')):
+        save_image(torch.cat([image, torch.zeros(1, 1, image_size, image_size)], dim=1)[:, :3, ...], 'test1.png')
+    # else:
+    #     save_image(torch.cat([image, torch.zeros(1, 1, image_size, image_size)], dim=1)[:, :3, ...], 'test.png')
+    return image[0]
 
 def refine_occ(occ,Ori2D):
     index = Ori2D.nonzero()

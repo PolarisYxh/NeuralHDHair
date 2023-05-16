@@ -92,7 +92,6 @@ class image_loader(base_loader):
         }
         return return_list
 
-
     def generate_test_data(self):
         path = os.path.join(self.root, self.opt.test_file)
         save_path=os.path.join(self.opt.current_path, self.opt.save_root, self.opt.check_name, 'record', self.opt.test_file)

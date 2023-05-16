@@ -201,8 +201,34 @@ class HairSpatNetSolver(BaseSolver):
             pred_ori=pred_ori.permute(0,2,3,4,1)
             pred_ori=pred_ori.cpu().numpy()
             ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter)+'_1')
+            
+    def inference(self,image):
+        with torch.no_grad():
+            image=trans_image(image, self.opt.image_size)#相当于get_image
+            image=torch.from_numpy(image)
+            image=image.permute(2,0,1)
+            Ori2D = image.clone()
+            # image = get_Bust1(file_name, image, self.opt.image_size)#TODO
 
+            image = torch.unsqueeze(image, 0)
+            Ori2D=torch.unsqueeze(Ori2D,0)
 
+            # oriImg = cv2.resize(oriImg, (self.opt.image_size, self.opt.image_size))
+            image = image.type(torch.float)
+            Ori2D = Ori2D.type(torch.float)
+            if self.use_gpu():
+                image = image.cuda()
+                Ori2D = Ori2D.cuda()
+
+            out_ori, out_occ = self.model.test(image,Ori2D)
+            
+            out_occ[out_occ>=0.2]=1
+            out_occ[out_occ<0.2]=0
+            pred_ori=out_ori*out_occ
+            pred_ori=pred_ori.permute(0,2,3,4,1)
+            pred_ori=pred_ori.cpu().numpy()
+            # ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter)+'_1')
+            return pred_ori
     def loss_backward(self, losses, optimizer,retain=False):
         optimizer.zero_grad()
         loss = sum(losses.values()).mean()

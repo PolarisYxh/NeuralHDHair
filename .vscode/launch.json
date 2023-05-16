@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             //for train spat-net
-            // "args": ["--name=2023-03-28_bust", "--model_name=HairSpatNet", "--blur_ori", "--no_use_depth", "--no_use_L","--gpu_ids=1", "--print_freq=10", "--display_freq=10", "--batch_size=1","--save_latest_freq=5000","--lr_update_freq=5000","--lr=0.0001","--strand_dir", "data/cache"],//"--continue_train", "--check_name=2023-04-07_bust","--which_iter=147"
+            "args": ["--name=2023-03-28_bust", "--model_name=HairSpatNet", "--blur_ori", "--no_use_depth", "--no_use_L","--gpu_ids=1", "--print_freq=10", "--display_freq=10", "--batch_size=1","--save_latest_freq=5000","--lr_update_freq=5000","--lr=0.0001","--strand_dir", "data/cache"],//"--continue_train", "--check_name=2023-04-07_bust","--which_iter=147"
             //for test run test.py and visualize spat-net，run batch_test.py or 
             // "args": ["--name=2023-04-07_bust_test1", "--model_name=HairSpatNet", "--test_file","strands00001", "--save_dir=data/Train_input","--blur_ori", "--no_use_depth", "--no_use_L", "--gpu_ids=2", "--batch_size=1","--continue_train","--which_iter=1640000","--check_name=2023-04-17_bust"],
             //for train High-resolution-net
@@ -19,7 +19,7 @@
             //run main.py for test growingnet
             // "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--batch_size=1", "--sd_per_batch=800", "--pt_per_strand", "72","--lr_update_freq=1000", "--strand_dir", "data/Train_input","--gpu_ids=3","--continue_train","--display_freq=1","--check_name=2023-05-11_bust_prev3","--which_iter=5000","--condition"],
             //for test run test.py and visualize run batch_test.py growing net
-            "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--test_file","strands00001","--save_dir=data/Train_input",  "--strand_dir", "data/Train_input","--gpu_ids=1","--continue_train","--which_iter=5000","--check_name=2021-10-13_bust"],//,"--condition""--save_dir", "/home/yangxinhang/NeuralHDHair","--test_file","1","--continue_train",
+            // "args": ["--name=2023-05-06_bust_test", "--model_name=GrowingNet",  "--test_file","strands00001","--save_dir=data/Train_input",  "--strand_dir", "data/Train_input","--gpu_ids=1","--continue_train","--which_iter=5000","--check_name=2021-10-13_bust"],//,"--condition""--save_dir", "/home/yangxinhang/NeuralHDHair","--test_file","1","--continue_train",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
