@@ -580,20 +580,21 @@ def save_occ_as_mat(occ,opt):
         mkdirs(path)
     scipy.io.savemat(os.path.join(path, "Occ3D_pred.mat"), {"Occ": occ.transpose(1, 2, 0).astype(np.float64)})
 
-def save_ori_as_mat(ori,opt,suffix=''):
+def save_ori_as_mat(ori,opt,save=True,suffix=''):
     ori=ori * np.array([1, -1, -1])
     # ori=(ori+1)/2
 
     ori=ori.transpose(0,2,3,4,1)
     _,H,W,C,D=ori.shape[:]
     ori=ori.reshape(H ,W,C*D)
-    if opt.save_dir is not None:
-        path = os.path.join(opt.save_dir, opt.test_file)
-    else:
-        path = os.path.join(opt.current_path, opt.save_root, opt.check_name, 'record', opt.test_file)
-    if not os.path.exists(path):
-        mkdirs(path)
-    scipy.io.savemat(os.path.join(path,'Ori3D{}_pred.mat'.format(suffix)), {'Ori': ori})
+    if save:
+        if opt.save_dir is not None and opt.test_file is not None:
+            path = os.path.join(opt.save_dir, opt.test_file)
+        else:
+            path = os.path.join(opt.current_path, opt.save_root, opt.check_name, 'record', opt.test_file)
+        if not os.path.exists(path):
+            mkdirs(path)
+        scipy.io.savemat(os.path.join(path,'Ori3D{}_pred.mat'.format(suffix)), {'Ori': ori})
     return ori
 # def write_strand(points,opt,segments,type='ori'):
 #     print('delete by {} ....'.format(type))
@@ -1459,7 +1460,7 @@ def get_Bust(dir,image,image_size):
     # label=torch.where(image[:,0:2,...]!=0,torch.ones_like(image[:,0:2,...]),torch.zeros_like(image[:,0:2,...]))
     Bust = torch.unsqueeze(Bust, 0)#人体渲染图
     image[:,0:2,...]=torch.where(label[:,0:2,...]==1,image[:,0:2,...],Bust[:,0:2,...])
-    # save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
+    save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
     if not os.path.exists(os.path.join(dir, 'trans.txt')):
         save_image(torch.cat([image, torch.zeros(1, 1, image_size, image_size)], dim=1)[:, :3, ...], 'test1.png')
     # else:
@@ -1467,12 +1468,12 @@ def get_Bust(dir,image,image_size):
 
 
     return image[0]
-def get_Bust1(mask, image, image_size):
+def get_Bust1(Bust_path,image, mask,image_size,trans=None):
     # label_path = os.path.join(dir, 'mask.png')
-    Bust_path=dir.split('data')[0]
+    # Bust_path=dir.split('data')[0]
     Bust_path=os.path.join(Bust_path,'data/Bust')
     ### use bust with different size to adpat different faces
-    if os.path.exists(os.path.join(dir,'trans.txt')):
+    if isinstance(trans,np.ndarray):
 
         if dir[-2:]!='_0':
             trans=os.path.join(dir,'trans.txt')
@@ -1492,7 +1493,7 @@ def get_Bust1(mask, image, image_size):
             randI=random.randint(2,6)
             Bust_path=os.path.join(Bust_path,'color{}.png'.format(randI))
     else:
-        Bust_path = os.path.join(Bust_path, 'color5.png')
+        Bust_path = os.path.join(Bust_path, 'color9.png')
 
     # Bust_path = os.path.join(dir, 'color.png')
 
@@ -1518,11 +1519,7 @@ def get_Bust1(mask, image, image_size):
     # label=torch.where(image[:,0:2,...]!=0,torch.ones_like(image[:,0:2,...]),torch.zeros_like(image[:,0:2,...]))
     Bust = torch.unsqueeze(Bust, 0)#人体渲染图
     image[:,0:2,...]=torch.where(label[:,0:2,...]==1,image[:,0:2,...],Bust[:,0:2,...])
-    # save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
-    if not os.path.exists(os.path.join(dir, 'trans.txt')):
-        save_image(torch.cat([image, torch.zeros(1, 1, image_size, image_size)], dim=1)[:, :3, ...], 'test1.png')
-    # else:
-    #     save_image(torch.cat([image, torch.zeros(1, 1, image_size, image_size)], dim=1)[:, :3, ...], 'test.png')
+    save_image(torch.cat([image,torch.zeros(1,1,256,256)],dim=1),'display.png')
     return image[0]
 
 def refine_occ(occ,Ori2D):

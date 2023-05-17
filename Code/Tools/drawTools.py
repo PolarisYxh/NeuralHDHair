@@ -191,19 +191,29 @@ def draw_gt_arrows_by_projection(fileDir, test=False):
                 cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
     cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)
            
-def draw_arrows_by_projection1(fileDir,iter,draw_occ=True):
+def draw_arrows_by_projection1(fileDir,iter,draw_occ=True,hair_ori=None):
     h = 128
     w = 128
     d = 96
     flip = True
+    transfer = True
     noise = True
     ori = os.path.join(fileDir, "Ori.png").replace("\\", "/")
     target = cv2.imread(ori)
     target = cv2.resize(target, (1024, 1024), interpolation=cv2.INTER_NEAREST)
     target = cv2.flip(target,flipCode=1)
     # target = get_conditional_input_data(fileDir, flip, noise, image_size=1024) * 255
-    hair_ori = get_pred_3D_ori(fileDir, iter, flip, draw_occ=draw_occ)
-    
+    if not isinstance(hair_ori,np.ndarray):
+        hair_ori = get_pred_3D_ori(fileDir, iter, flip, draw_occ=draw_occ)
+    else:
+        hair_ori = np.reshape(hair_ori, [hair_ori.shape[0], hair_ori.shape[1], 3, -1])# ori: 128*128*3*96
+        hair_ori = hair_ori.transpose([0, 1, 3, 2]).transpose(2, 0, 1, 3)
+        if flip:
+            hair_ori = hair_ori[:, :, ::-1, :] * np.array([-1.0, 1.0, 1.0])
+        hair_ori = np.ascontiguousarray(hair_ori)
+        if transfer:
+            hair_ori = hair_ori*np.array([1,-1,-1])  # scaled
+        
     image = get_vox_total_pic(hair_ori)/255 # image 128*128*3, (0,1)
     # cv2.imwrite("2.png",image.astype('uint8'))
     mask = (image**2).sum(-1) > 0
@@ -225,6 +235,8 @@ def draw_arrows_by_projection1(fileDir,iter,draw_occ=True):
 
                 cv2.arrowedLine(target, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (0, 0, 255), 1,tipLength = 0.5)
     if draw_occ:
+        # cv2.imshow("1",target)
+        # cv2.waitKey()
         cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}_1.jpg"), target)
     else:
         cv2.imwrite(os.path.join(fileDir,f"pred_ori_{iter}.jpg"), target)

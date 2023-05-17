@@ -45,6 +45,8 @@ class HairSpatNetSolver(BaseSolver):
             path = os.path.join(opt.current_path, opt.save_root, opt.check_name, 'checkpoint')
             if os.path.exists(path):
                 self.net = self.load_network(self.net, 'HairSpatNet', opt.which_iter, opt)
+            else:
+                print(path+" not exists!")
         else:
             print(" Training from Scratch! ")
             self.net.init_weights(opt.init_type, opt.init_variance)
@@ -202,18 +204,18 @@ class HairSpatNetSolver(BaseSolver):
             pred_ori=pred_ori.cpu().numpy()
             ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter)+'_1')
             
-    def inference(self,image):
+    def inference(self,image,mask):
         with torch.no_grad():
+            #以下相当于dataloader.generate_test_data()
             image=trans_image(image, self.opt.image_size)#相当于get_image
             image=torch.from_numpy(image)
             image=image.permute(2,0,1)
             Ori2D = image.clone()
-            # image = get_Bust1(file_name, image, self.opt.image_size)#TODO
-
+            # image = get_Bust("/home/yxh/Documents/company/NeuralHDHair/data/Train_input/DB1", image, self.opt.image_size)#TODO
+            # image = get_Bust1(self.opt.current_path,image,mask,self.opt.image_size)
             image = torch.unsqueeze(image, 0)
             Ori2D=torch.unsqueeze(Ori2D,0)
-
-            # oriImg = cv2.resize(oriImg, (self.opt.image_size, self.opt.image_size))
+            # 以下相当于self.preprocess_input1
             image = image.type(torch.float)
             Ori2D = Ori2D.type(torch.float)
             if self.use_gpu():
@@ -225,9 +227,14 @@ class HairSpatNetSolver(BaseSolver):
             out_occ[out_occ>=0.2]=1
             out_occ[out_occ<0.2]=0
             pred_ori=out_ori*out_occ
-            pred_ori=pred_ori.permute(0,2,3,4,1)
+            pred_ori=pred_ori.permute(0,2,3,4,1)#[1, 96, 128, 128, 3]
             pred_ori=pred_ori.cpu().numpy()
-            # ori = save_ori_as_mat(pred_ori,self.opt,suffix="_"+str(self.opt.which_iter)+'_1')
+            pred_ori = save_ori_as_mat(pred_ori,self.opt,save=False,suffix="_"+str(self.opt.which_iter)+'_1')
+            # 以下为save_ori_as_mat所做的操作
+            # pred_ori=pred_ori * np.array([1, -1, -1])
+            # pred_ori=pred_ori.transpose(0,2,3,4,1)
+            # _,H,W,C,D=pred_ori.shape[:]
+            # pred_ori=pred_ori.reshape(H ,W,C*D)
             return pred_ori
     def loss_backward(self, losses, optimizer,retain=False):
         optimizer.zero_grad()

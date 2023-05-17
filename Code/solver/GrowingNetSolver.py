@@ -221,37 +221,28 @@ class GrowingNetSolver(BaseSolver):
             self.update_learning_rate(epoch)
             iter_counter.record_epoch_end()
 
-
-    def test(self,dataloader):
-        if self.opt.Bidirectional_growth:
-            datas=dataloader.generate_random_root()
-        else:
-            datas=dataloader.generate_test_data(self.opt.growInv)
+    def get_pred_strands(self,datas):
         strands, gt_orientation,labels = self.preprocess_input(datas)
-
-
 
         pt_num = self.pt_num//2 #default is self.pt_num-1
 
         with torch.no_grad():
-            for i in range(2):
+            if self.opt.Bidirectional_growth:
+                print('begin.....')
+                start = time.time()
+                # wcenters,wlatents=self.model_on_one_gpu.encoder(gt_orientation)
+                # wlatents=wlatents.expand(len(self.opt.gpu_ids),*wlatents.size()[1:])
+                # print(wlatents.size())
+                # wcenters=wcenters.expand(len(self.opt.gpu_ids),*wcenters.size()[1:])
+                # print('encoder cost:',time.time()-start)
+                # gt_orientation = close_voxel(gt_orientation, 5)
+                gt_orientation=gt_orientation.expand(len(self.opt.gpu_ids),*gt_orientation.size()[1:])
+                out_points_2, labels_2, out_points_2_Inv, labels_2_Inv=self.model(strands,gt_orientation,pt_num,'rnn')
+                # torch.cuda.synchronize()
+                print('grow cost:', time.time() - start)
 
-                if self.opt.Bidirectional_growth:
-                    print('begin.....')
-                    start = time.time()
-                    # wcenters,wlatents=self.model_on_one_gpu.encoder(gt_orientation)
-                    # wlatents=wlatents.expand(len(self.opt.gpu_ids),*wlatents.size()[1:])
-                    # print(wlatents.size())
-                    # wcenters=wcenters.expand(len(self.opt.gpu_ids),*wcenters.size()[1:])
-                    # print('encoder cost:',time.time()-start)
-                    # gt_orientation = close_voxel(gt_orientation, 5)
-                    gt_orientation=gt_orientation.expand(len(self.opt.gpu_ids),*gt_orientation.size()[1:])
-                    out_points_2, labels_2, out_points_2_Inv, labels_2_Inv=self.model(strands,gt_orientation,pt_num,'rnn')
-                    # torch.cuda.synchronize()
-                    print('grow cost:', time.time() - start)
-
-                else:
-                    out_points_2, labels_2 = self.model(strands,gt_orientation,self.pt_num-1,'rnn')
+            else:
+                out_points_2, labels_2 = self.model(strands,gt_orientation,self.pt_num-1,'rnn')
 
 
         print(out_points_2.size())
@@ -297,9 +288,16 @@ class GrowingNetSolver(BaseSolver):
                                                                             strand_delete_by_label_Inv, segment_label,
                                                                             segment_label_Inv,
                                                                             self.opt.Bidirectional_growth)
+        return final_strand_del_by_ori,final_segment
+    def test(self,dataloader):
+        if self.opt.Bidirectional_growth:
+            datas=dataloader.generate_random_root()
+        else:
+            datas=dataloader.generate_test_data(self.opt.growInv)
+        final_strand_del_by_ori,final_segment=self.get_pred_strands(datas)
         write_strand(final_strand_del_by_ori, self.opt, final_segment, 'ori')
         # write_strand(final_strand_del_by_label, self.opt, final_segment_label, 'label')
-    def generate_random_root(self,gt_orientation):
+    def generate_random_root(self):
         occ=np.linalg.norm(self.gt_orientation,axis=-1)[0]
         occ=(occ>0).astype(np.float32)
         # occ[:,30:,:]=0
@@ -341,76 +339,27 @@ class GrowingNetSolver(BaseSolver):
         }
         return return_list
     
-    def inference(self, gt_orientation):
+    def inference(self, ori):
+        # ori = scipy.io.loadmat("/home/yxh/Documents/company/NeuralHDHair/data/Train_input/DB1/Ori_gt.mat", verify_compressed_data_integrity=False)['Ori'].astype(np.float32)
+        ori = np.reshape(ori, [ori.shape[0], ori.shape[1], 3, -1])# ori: 128*128*3*96
+        ori = ori.transpose([0, 1, 3, 2]).transpose(2, 0, 1, 3)# ori: 96*128*128*3
+
+        transfer = True
+        ori = np.ascontiguousarray(ori)
+        if transfer:
+            gt_orientation= ori*np.array([1,-1,-1])  # scaled
+        else:
+            gt_orientation= ori
+        gt_orientation = gt_orientation[None]
+        self.gt_orientation = gt_orientation
         if self.opt.Bidirectional_growth:
-            datas=self.generate_random_root(gt_orientation)
+            datas=self.generate_random_root()
         else:
             datas=self.generate_test_data(self.opt.growInv)
-        strands, gt_orientation,labels = self.preprocess_input(datas)
-
-        with torch.no_grad():
-            if self.opt.Bidirectional_growth:
-                print('begin.....')
-                start = time.time()
-                # wcenters,wlatents=self.model_on_one_gpu.encoder(gt_orientation)
-                # wlatents=wlatents.expand(len(self.opt.gpu_ids),*wlatents.size()[1:])
-                # print(wlatents.size())
-                # wcenters=wcenters.expand(len(self.opt.gpu_ids),*wcenters.size()[1:])
-                # print('encoder cost:',time.time()-start)
-                # gt_orientation = close_voxel(gt_orientation, 5)
-                gt_orientation=gt_orientation.expand(len(self.opt.gpu_ids),*gt_orientation.size()[1:])
-                out_points_2, labels_2, out_points_2_Inv, labels_2_Inv=self.model(strands,gt_orientation,self.pt_num//2,'rnn')
-                # torch.cuda.synchronize()
-                print('grow cost:', time.time() - start)
-
-            else:
-                out_points_2, labels_2 = self.model(strands,gt_orientation,self.pt_num-1,'rnn')
-
-
-        print(out_points_2.size())
-        gt_orientation=gt_orientation.permute(0,2,3,4,1)
-        out_points_2=out_points_2.permute(0,2,3,1)
-        labels_2=labels_2.permute(0,2,3,1)
-
-        out_points_2 = out_points_2.reshape(1, -1,  self.pt_num-1,3)
-        labels_2 = labels_2.reshape(1, -1,  self.pt_num-1,2)
-
-        gt_orientation=gt_orientation.cpu().numpy()
-        out_points_2=out_points_2.cpu().numpy()
-        labels_2=labels_2.cpu().numpy()
-        if self.opt.Bidirectional_growth:
-
-            out_points_2_Inv = out_points_2_Inv.permute(0, 2, 3, 1)
-            labels_2_Inv = labels_2_Inv.permute(0, 2, 3, 1)
-            out_points_2_Inv=out_points_2_Inv.reshape(1,-1,self.pt_num-1,3)
-            labels_2_Inv=labels_2_Inv.reshape(1,-1,self.pt_num-1,2)
-            out_points_2_Inv=out_points_2_Inv.cpu().numpy()
-            labels_2_Inv=labels_2_Inv.cpu().numpy()
-
-
-        mask = np.linalg.norm(gt_orientation, axis=-1)
-
-        strand_delete_by_ori, segment = delete_point_out_ori(mask, out_points_2)
-        if self.opt.pred_label:
-            strand_delete_by_label, segment_label = delete_point_out_label(out_points_2, labels_2)
-        if self.opt.Bidirectional_growth:
-            strand_delete_by_ori_Inv, segment_Inv = delete_point_out_ori(mask, out_points_2_Inv)
-            if self.opt.pred_label:
-                strand_delete_by_label_Inv, segment_label_Inv = delete_point_out_label(out_points_2_Inv, labels_2_Inv)
-        else:
-            segment_Inv = None
-            segment_label_Inv = None
-            strand_delete_by_ori_Inv = None
-            strand_delete_by_label_Inv = None
-
-        final_strand_del_by_ori, final_segment = concat_strands(strand_delete_by_ori, strand_delete_by_ori_Inv, segment,
-                                                                segment_Inv, self.opt.Bidirectional_growth,gt_orientation.shape[2]//96)
-        if self.opt.pred_label:
-            final_strand_del_by_label, final_segment_label = concat_strands(strand_delete_by_label,
-                                                                            strand_delete_by_label_Inv, segment_label,
-                                                                            segment_label_Inv,
-                                                                            self.opt.Bidirectional_growth)
-        write_strand(final_strand_del_by_ori, self.opt, final_segment, 'ori')
+        final_strand_del_by_ori,final_segment = self.get_pred_strands(datas)
+        
+        final_strand_del_by_ori = transform_Inv(final_strand_del_by_ori)
+        # write_strand(final_strand_del_by_ori, self.opt, final_segment, 'ori')
         return final_strand_del_by_ori,final_segment
         # write_strand(final_strand_del_by_label, self.opt, final_segment_label, 'label')
 

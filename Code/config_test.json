@@ -1,0 +1,19 @@
+{
+    "//":"相对文件所在文件夹的路径",
+    "faceParsing":
+    {
+        "cache_path":"cache/",
+        "url0":"http://0.0.0.0:40085",
+        "url0":"http://10.10.52.151:40085",
+        "url0":"http://speech.ths8.com:6080/vc_faceparsing",
+        "url":"https://alg.aicubes.cn/vc_faceparsing"
+    },
+    "insightFace":
+    {
+        "cache_path":"cache/",
+        "url0":"http://0.0.0.0:40087",
+        "url0":"http://10.10.52.151:40087",
+        "url0":"http://speech.ths8.com:6080/vc_insightface",
+        "url":"https://alg.aicubes.cn/vc_insightface"
+    }
+}
